@@ -5,6 +5,11 @@
 #include "Serialization/JsonSerializer.h"
 #include "Engine.h"
 
+void print(FString input)
+{
+	UE_LOG(LogTemp, Warning, TEXT("%s"), *input);
+}
+
 bool UJsonParseHelper::ParseJson(const FString& JsonStr, FJsonValueContent & JsonValue)
 {
 	TSharedPtr<FJsonValue> InnerJsonValue;
@@ -18,7 +23,6 @@ bool UJsonParseHelper::ParseJson(const FString& JsonStr, FJsonValueContent & Jso
 
 		return true;
 	}
-	
 	return false;
 }
 
@@ -89,13 +93,24 @@ FString UJsonParseHelper::NodeAsString(const FJsonValueContent& JsonValue, bool 
 		Key = JsonValue.Key;
 		return JsonValue.Value->AsString();
 	}
+	else if (JsonValue.ValueType == FJsonValueType::JVT_NUMBER)
+	{
+		bSucceed = true;
+		Key = JsonValue.Key;
+		return FString::SanitizeFloat(JsonValue.Value->AsNumber());
+	}
+	else if (JsonValue.ValueType == FJsonValueType::JVT_BOOL)
+	{
+		bSucceed = true;
+		Key = JsonValue.Key;
+		return JsonValue.Value->AsBool() ? TEXT("true") : TEXT("false");
+	}
 
 	return FString();
 }
 
-FString UJsonParseHelper::GetStringValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key)
+bool UJsonParseHelper::GetStringValue(const FJsonValueContent& JsonValue, const FString& Key, FString& FoundValue)
 {
-	bSucceed = false;
 	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
 	{
 		for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsObject()->Values)
@@ -103,79 +118,62 @@ FString UJsonParseHelper::GetStringValue(const FJsonValueContent& JsonValue, boo
 			if (Element.Key == Key)
 			{
 				FString OutStr;
+				bool OutBool;
+				float OutNumber;
 				if (Element.Value->TryGetString(OutStr))
 				{
-					bSucceed = true;
-					return OutStr;
+					FoundValue = OutStr;
+					return true;
+				}
+				else if(Element.Value->TryGetNumber(OutNumber))
+				{
+					FoundValue = FString::SanitizeFloat(OutNumber);
+					return true;
+				}
+				else if (Element.Value->TryGetBool(OutBool))
+				{
+					FoundValue = OutBool ? TEXT("true") : TEXT("false");
+					return true;
 				}
 			}
 		}
 	}
 	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
 	{
-		if (JsonValue.Value->AsArray().Num() > 0 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
+		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
 		{
 			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
 			{
 				if (Element.Key == Key)
 				{
 					FString OutStr;
+					bool OutBool;
+					float OutNumber;
 					if (Element.Value->TryGetString(OutStr))
 					{
-						bSucceed = true;
-						return OutStr;
+						FoundValue = OutStr;
+						return true;
+					}
+					else if (Element.Value->TryGetNumber(OutNumber))
+					{
+						FoundValue = FString::SanitizeFloat(OutNumber);
+						return true;
+					}
+					else if (Element.Value->TryGetBool(OutBool))
+					{
+						FoundValue = OutBool ? TEXT("true") : TEXT("false");
+						return true;
 					}
 				}
 			}
 		}
 	}
 	
-	return FString();
+	return false;
 }
 
-float UJsonParseHelper::GetNumberValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key)
+bool UJsonParseHelper::GetBoolValue(const FJsonValueContent& JsonValue, const FString& Key, bool& FoundValue)
 {
-	bSucceed = false;
-	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
-	{
-		for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsObject()->Values)
-		{
-			if (Element.Key == Key)
-			{
-				float OutNumber;
-				if (Element.Value->TryGetNumber(OutNumber))
-				{
-					bSucceed = true;
-					return OutNumber;
-				}
-			}
-		}
-	}
-	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
-	{
-		if (JsonValue.Value->AsArray().Num() > 0 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
-		{
-			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
-			{
-				if (Element.Key == Key)
-				{
-					float OutNumber;
-					if (Element.Value->TryGetNumber(OutNumber))
-					{
-						bSucceed = true;
-						return OutNumber;
-					}
-				}
-			}
-		}
-	}
-
-	return 0.0f;
-}
-
-bool UJsonParseHelper::GetBoolValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key)
-{
-	bSucceed = false;
 	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
 	{
 		for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsObject()->Values)
@@ -185,15 +183,15 @@ bool UJsonParseHelper::GetBoolValue(const FJsonValueContent& JsonValue, bool& bS
 				bool OutBool;
 				if (Element.Value->TryGetBool(OutBool))
 				{
-					bSucceed = true;
-					return OutBool;
+					FoundValue = OutBool;
+					return true;
 				}
 			}
 		}
 	}
 	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
 	{
-		if (JsonValue.Value->AsArray().Num() > 0 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
+		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
 		{
 			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
 			{
@@ -202,8 +200,8 @@ bool UJsonParseHelper::GetBoolValue(const FJsonValueContent& JsonValue, bool& bS
 					bool OutBool;
 					if (Element.Value->TryGetBool(OutBool))
 					{
-						bSucceed = true;
-						return OutBool;
+						FoundValue = OutBool;
+						return true;
 					}
 				}
 			}
@@ -213,9 +211,8 @@ bool UJsonParseHelper::GetBoolValue(const FJsonValueContent& JsonValue, bool& bS
 	return false;
 }
 
-FJsonValueContent UJsonParseHelper::GetChildJsonNode(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key)
+bool UJsonParseHelper::GetChildJsonNode(const FJsonValueContent& JsonValue, const FString& Key, FJsonValueContent& FoundValue)
 {
-	bSucceed = false;
 	FJsonValueContent JsonValueContent;
 	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
 	{
@@ -223,33 +220,79 @@ FJsonValueContent UJsonParseHelper::GetChildJsonNode(const FJsonValueContent& Js
 		{
 			if (Element.Key == Key)
 			{
-				bSucceed = true;
 				JsonValueContent.Value = Element.Value;
 				JsonValueContent.Key = Element.Key;
 				JsonValueContent.ValueType = ConfirmJsonType(Element.Value);
-				return JsonValueContent;
+				FoundValue = JsonValueContent;
+				return true;
 			}
 		}
 	}
 	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
 	{
-		if (JsonValue.Value->AsArray().Num() > 0 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
+		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
 		{
 			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
 			{
 				if (Element.Key == Key)
 				{
-					bSucceed = true;
 					JsonValueContent.Value = Element.Value;
 					JsonValueContent.Key = Element.Key;
 					JsonValueContent.ValueType = ConfirmJsonType(Element.Value);
-					return JsonValueContent;
+					FoundValue = JsonValueContent;
+					return true;
 				}
 			}
 		}
 	}
 
-	return FJsonValueContent();
+	return false;
+}
+
+bool UJsonParseHelper::GetNumberValue(const FJsonValueContent& JsonValue, const FString& Key, int32& FoundValue)
+{
+	return false;
+}
+
+bool UJsonParseHelper::Generic_GetNumberValue(const FJsonValueContent& JsonValue, const FString& Key, void* ValueAddr, FProperty* ValueType)
+{
+#if ENGINE_MAJOR_VERSION == 4
+	FFloatProperty* FloatProperty = CastField<FFloatProperty>(ValueType);
+	float* OutPtr = FloatProperty->GetPropertyValuePtr(ValueAddr);
+#elif ENGINE_MAJOR_VERSION == 5
+	FDoubleProperty* DoubleProperty = CastField<FDoubleProperty>(ValueType);
+	double* OutPtr = DoubleProperty->GetPropertyValuePtr(ValueAddr);
+#endif
+
+	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
+	{
+		double OutNumber;
+		if (JsonValue.Value->AsObject()->TryGetNumberField(Key, OutNumber))
+		{
+			*OutPtr = OutNumber;
+			return true;
+		}
+	}
+	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
+	{
+		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
+		{
+			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
+			{
+				if (Element.Key == Key)
+				{
+					float OutNumber;
+					if (Element.Value->TryGetNumber(OutNumber))
+					{
+						*OutPtr = OutNumber;
+						return true;
+					}
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 FString UJsonParseHelper::JsonNodeToString(const FJsonValueContent& JsonValue)
@@ -315,9 +358,10 @@ FString UJsonParseHelper::NodeToString(FJsonValueContent JsonValue)
 	case FJsonValueType::JVT_BOOL:
 		return JsonValue.Value->AsBool() ? TEXT("true") : TEXT("false");
 	case FJsonValueType::JVT_NUMBER:
-		return FString::FromInt(JsonValue.Value->AsNumber());
+		//return FString::FromInt(JsonValue.Value->AsNumber());
+		return FString::SanitizeFloat(JsonValue.Value->AsNumber());
 	case FJsonValueType::JVT_STRING:
-		return JsonValue.Value->AsString();
+		return TEXT("\"") + JsonValue.Value->AsString() + TEXT("\"");
 	default:
 		return FString();
 	}

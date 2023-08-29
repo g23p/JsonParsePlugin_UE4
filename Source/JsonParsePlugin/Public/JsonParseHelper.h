@@ -7,7 +7,6 @@
 #include "Runtime/Json/Public/Json.h"
 #include "JsonParseHelper.generated.h"
 
-class FJsonObject;
 
 UENUM(BlueprintType)
 enum class FJsonValueType : uint8
@@ -32,16 +31,16 @@ enum class EJsonValueTypeBP : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FJsonValueContent
+struct JSONPARSEPLUGIN_API FJsonValueContent
 {
 	GENERATED_BODY()
 
 	TSharedPtr<FJsonValue> Value;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "JsonParse|JsonValue")
 		FString Key;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "JsonParse|JsonValue")
 		FJsonValueType ValueType;
 };
 
@@ -72,17 +71,36 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Json|JsonParser")
 		static FString NodeAsString(const FJsonValueContent& JsonValue, bool& bSucceed, FString& Key);
 
-	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
-		static FString GetStringValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key);
 
-	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
-		static float GetNumberValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key);
+	UFUNCTION(BlueprintCallable, Category = "Json|JsonParser", meta = (BlueprintInternalUseOnly = "true"))
+		static bool GetStringValue(const FJsonValueContent& JsonValue, const FString& Key, FString& FoundValue);
 
-	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
-		static bool GetBoolValue(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key);
+	UFUNCTION(BlueprintCallable, Category = "Json|JsonParser", meta = (BlueprintInternalUseOnly = "true"))
+		static bool GetBoolValue(const FJsonValueContent& JsonValue, const FString& Key, bool& FoundValue);
 
-	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"))
-		static FJsonValueContent GetChildJsonNode(const FJsonValueContent& JsonValue, bool& bSucceed, const FString& Key);
+	UFUNCTION(BlueprintCallable, Category = "Json|JsonParser", meta = (BlueprintInternalUseOnly = "true"))
+		static bool GetChildJsonNode(const FJsonValueContent& JsonValue, const FString& Key, FJsonValueContent& FoundValue);
+
+	UFUNCTION(BlueprintCallable, CustomThunk, Category = "Json|JsonParser", meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "FoundValue"))
+		static bool GetNumberValue(const FJsonValueContent& JsonValue, const FString& Key, int32& FoundValue);
+
+	//DECLARE_FUNCTION(execGetNumberValue)
+	static void execGetNumberValue(UObject* Context, FFrame& Stack, RESULT_DECL)
+	{
+		P_GET_STRUCT_REF(FJsonValueContent, JsonValue);
+		P_GET_PROPERTY(FStrProperty, Key);
+
+		Stack.StepCompiledIn<FProperty>(NULL);
+		FProperty* ValueProperty = CastField<FProperty>(Stack.MostRecentProperty);
+		void* ValueAddrIn = Stack.MostRecentPropertyAddress;
+
+		P_FINISH;
+		P_NATIVE_BEGIN;
+		*(bool*)RESULT_PARAM = UJsonParseHelper::Generic_GetNumberValue(JsonValue, *Key, ValueAddrIn, ValueProperty);
+		P_NATIVE_END;
+	}
+
+	static bool Generic_GetNumberValue(const FJsonValueContent& JsonValue, const FString& Key, void* ValueAddr, FProperty* ValueType);
 
 	UFUNCTION(BlueprintCallable, Category = "Json|JsonWriter")
 		static FString JsonNodeToString(const FJsonValueContent& JsonValue);

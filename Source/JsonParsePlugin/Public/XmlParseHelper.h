@@ -36,7 +36,7 @@ UCLASS()
 class JSONPARSEPLUGIN_API UXmlParseHelper : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-
+		
 
 public:
 
@@ -59,6 +59,9 @@ public:
 		static void SetNewContent(FXmlNodeContent Node, const FString& NewContent);
 
 	UFUNCTION(BlueprintCallable, Category = "Xml|XmlWriter")
+		static bool AddNewNode(FXmlFileContent XmlFile, FString NewTag, FString NewContent);
+
+	UFUNCTION(BlueprintCallable, Category = "Xml|XmlWriter")
 		static bool SaveChange(FXmlFileContent XmlFileContent, const FString& SavePath);
 
 	UFUNCTION(BlueprintCallable, Category = "Xml|XmlWriter")
@@ -66,4 +69,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Xml|XmlParser")
 		static bool IsValid(FXmlFileContent XmlFile);
+
+	UFUNCTION(BlueprintCallable, Category = "Xml|XmlWriter")
+		static bool FindChildContent(FXmlNodeContent Node, const FString& Tag, FXmlNodeContent& OutNode, FString& Content);
+
+	
 };

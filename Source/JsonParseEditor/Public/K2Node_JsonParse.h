@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "K2Node.h"
+
 #include "K2Node_JsonParse.generated.h"
 
 /**
@@ -26,6 +27,7 @@ public:
 	virtual void ExpandNode(class FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
 	virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
 	virtual void PinDefaultValueChanged(UEdGraphPin* Pin) override;
+
 	virtual void ReallocatePinsDuringReconstruction(TArray<UEdGraphPin*>& OldPins) override;
 
 	UEdGraphPin* GetThenPin() const;
@@ -42,5 +44,6 @@ protected:
 
 private:
 
-	UEdGraphPin* GetJsonTypePin(TArray<UEdGraphPin*>* OldPins);
+	UEdGraphPin* GetEnumPinFromAllPins(const TArray<UEdGraphPin*>* InPins);
+
 };

@@ -40,7 +40,7 @@ void UK2Node_JsonParse::AllocateDefaultPins()
 	UScriptStruct* JsonValueStruct = TBaseStructure<FJsonValueContent>::Get();
 	UEdGraphPin* JsonValuePin = CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Struct, JsonValueStruct, FK2Node_JsonParsePinName::JsonValuePinName);
 
-	UEnum* const JsonTypeEnum = FindObjectChecked<UEnum>(ANY_PACKAGE, TEXT("EJsonValueTypeBP"), true);
+	UEnum* const JsonTypeEnum = FindObjectChecked<UEnum>(nullptr, TEXT("/Script/JsonParsePlugin.EJsonValueTypeBP"), true);
 	UEdGraphPin* const JsonTypePin = CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Byte, JsonTypeEnum, FK2Node_JsonParsePinName::JsonTypePinName);
 	JsonTypePin->DefaultValue = JsonTypeEnum->GetNameStringByValue(static_cast<int>(EJsonValueTypeBP::NONE));
 
@@ -70,7 +70,8 @@ void UK2Node_JsonParse::ExpandNode(FKismetCompilerContext& CompilerContext, UEdG
 
 	static const FName JsonValueParamName(TEXT("JsonValue"));
 	static const FName JsonKeyParamName(TEXT("Key"));
-	static const FName IsSucceedParamName(TEXT("bSucceed"));
+	//static const FName IsSucceedParamName(TEXT("bSucceed"));
+	static const FName JsonReturnValueName(TEXT("FoundValue"));
 
 	UEdGraphPin* ExecPin = GetExecPin();
 	UEdGraphPin* ThenPin = GetThenPin();
@@ -84,37 +85,48 @@ void UK2Node_JsonParse::ExpandNode(FKismetCompilerContext& CompilerContext, UEdG
 	if (ExecPin && ThenPin)
 	{
 		FString TypeStr = JsonTypePin->GetDefaultAsString();
-		FName MyFUnctionName = FName();
+		FName MyFunctionName = FName();
 		UK2Node_CallFunction* CallFuncNode = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
-		if (TypeStr == TEXT("NONE")) {}
+
+		if (TypeStr == TEXT("NONE"))
+		{
+
+		}
 		else if (TypeStr == TEXT("NODE"))
 		{
-			MyFUnctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetChildJsonNode);
+			MyFunctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetChildJsonNode);
 		}
 		else if (TypeStr == TEXT("STRING"))
 		{
-			MyFUnctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetStringValue);
+			MyFunctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetStringValue);
 		}
 		else if (TypeStr == TEXT("BOOL"))
 		{
-			MyFUnctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetBoolValue);
+			MyFunctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetBoolValue);
 		}
 		else if (TypeStr == TEXT("NUMBER"))
 		{
-			MyFUnctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetNumberValue);
+			MyFunctionName = GET_FUNCTION_NAME_CHECKED(UJsonParseHelper, GetNumberValue);
 		}
 		
-		if (!MyFUnctionName.IsNone())
+		if (!MyFunctionName.IsNone())
 		{
-			CallFuncNode->FunctionReference.SetExternalMember(MyFUnctionName, UJsonParseHelper::StaticClass());
+			CallFuncNode->FunctionReference.SetExternalMember(MyFunctionName, UJsonParseHelper::StaticClass());
 			CallFuncNode->AllocateDefaultPins();
 
 			UEdGraphPin* CallJsonValue = CallFuncNode->FindPinChecked(JsonValueParamName);
 			UEdGraphPin* CallJsonKey = CallFuncNode->FindPinChecked(JsonKeyParamName);
-			UEdGraphPin* CallIsSucceed = CallFuncNode->FindPinChecked(IsSucceedParamName);
-			UEdGraphPin* CallReturnValue = CallFuncNode->GetReturnValuePin();
+			UEdGraphPin* CallIsSucceed = CallFuncNode->GetReturnValuePin();
+			UEdGraphPin* CallReturnValue = CallFuncNode->FindPinChecked(JsonReturnValueName);
+#if ENGINE_MAJOR_VERSION == 4
+			CallReturnValue->PinType.PinCategory = UEdGraphSchema_K2::PC_Float;
+#elif ENGINE_MAJOR_VERSION == 5
+			CallReturnValue->PinType.PinCategory = UEdGraphSchema_K2::PC_Real;
+			CallReturnValue->PinType.PinSubCategory = UEdGraphSchema_K2::PC_Double;
+#endif
 
 			CompilerContext.MovePinLinksToIntermediate(*ExecPin, *CallFuncNode->GetExecPin());
+
 			CompilerContext.MovePinLinksToIntermediate(*JsonValuePin, *CallJsonValue);
 			CompilerContext.MovePinLinksToIntermediate(*JsonKeyPin, *CallJsonKey);
 			CompilerContext.MovePinLinksToIntermediate(*IsSucceedPin, *CallIsSucceed);
@@ -150,29 +162,29 @@ void UK2Node_JsonParse::PinDefaultValueChanged(UEdGraphPin* Pin)
 void UK2Node_JsonParse::ReallocatePinsDuringReconstruction(TArray<UEdGraphPin*>& OldPins)
 {
 	AllocateDefaultPins();
-	
-	UEdGraphPin* JsonTypePin = GetJsonTypePin(&OldPins);
 
-	if(JsonTypePin)
-		OnEnumPinChanged(JsonTypePin);
+	UEdGraphPin* JsonTypePin = GetEnumPinFromAllPins(&OldPins);
+	OnEnumPinChanged(JsonTypePin);
 
 	RestoreSplitPins(OldPins);
 }
 
 void UK2Node_JsonParse::OnEnumPinChanged(UEdGraphPin* Pin)
 {
+	TArray<UEdGraphPin*> ConnectionList = Pin->LinkedTo;
+
 	UEdGraphPin* ReturnValuePin = GetReturnValuePin();
-	TArray<UEdGraphPin*> LinkedPins;
+	TArray<UEdGraphPin*> ReturnValuePinConnetionList;
 	if (ReturnValuePin)
 	{
-		LinkedPins = ReturnValuePin->LinkedTo;
+		ReturnValuePinConnetionList = ReturnValuePin->LinkedTo;
 		ReturnValuePin->BreakAllPinLinks(true);
 		RemovePin(ReturnValuePin);
 	}
 
 	FString TypeStr = Pin->GetDefaultAsString();
 
-	if (TypeStr == TEXT("NONE") || Pin->LinkedTo.Num() > 0)
+	if (ConnectionList.Num() > 0 || TypeStr == TEXT("NONE"))
 	{
 		CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Wildcard, FK2Node_JsonParsePinName::ReturnValuePinName);
 	}
@@ -191,15 +203,19 @@ void UK2Node_JsonParse::OnEnumPinChanged(UEdGraphPin* Pin)
 	}
 	else if (TypeStr == TEXT("NUMBER"))
 	{
+#if ENGINE_MAJOR_VERSION == 4
 		CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Float, FK2Node_JsonParsePinName::ReturnValuePinName);
+#elif ENGINE_MAJOR_VERSION == 5
+		CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Real, UEdGraphSchema_K2::PC_Double, FK2Node_JsonParsePinName::ReturnValuePinName);
+#endif
 	}
 
 	ReturnValuePin = GetReturnValuePin();
-	if (ReturnValuePin && LinkedPins.Num() > 0)
+	if (ReturnValuePin && ReturnValuePinConnetionList.Num() > 0)
 	{
 		const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();
 
-		for (UEdGraphPin* LinkedPin : LinkedPins)
+		for (UEdGraphPin* LinkedPin : ReturnValuePinConnetionList)
 		{
 			K2Schema->TryCreateConnection(ReturnValuePin, LinkedPin);
 		}
@@ -251,17 +267,19 @@ UEdGraphPin* UK2Node_JsonParse::GetReturnValuePin() const
 	return Pin;
 }
 
-UEdGraphPin* UK2Node_JsonParse::GetJsonTypePin(TArray<UEdGraphPin*>* OldPins)
+UEdGraphPin* UK2Node_JsonParse::GetEnumPinFromAllPins(const TArray<UEdGraphPin*>* InPins)
 {
-	const TArray<UEdGraphPin*>* TypePins = OldPins ? OldPins : &Pins;
+	const TArray<UEdGraphPin*>* PinsToSearch = InPins ? InPins : &Pins;
 
-	for (UEdGraphPin* TypePin : *TypePins)
+	UEdGraphPin* JsonTypePin = nullptr;
+	for (UEdGraphPin* Pin : *PinsToSearch)
 	{
-		if (TypePin && TypePin->PinName == FK2Node_JsonParsePinName::JsonTypePinName)
+		if (Pin && Pin->PinName == FK2Node_JsonParsePinName::JsonTypePinName)
 		{
-			return TypePin;
+			JsonTypePin = Pin;
+			break;
 		}
 	}
-
-	return nullptr;
+	return JsonTypePin;
 }
+

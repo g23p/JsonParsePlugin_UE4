@@ -23,7 +23,7 @@ bool UXmlParseHelper::GetRootNodeFromFileContent(FXmlFileContent XmlFileContent,
 	if (!XmlFileContent.XmlFile) return false;
 	RootNode.XmlNode = XmlFileContent.XmlFile->GetRootNode();
 	if (!RootNode.XmlNode)
-	{ 
+	{
 		return false; 
 	}
 	return true;
@@ -55,6 +55,27 @@ void UXmlParseHelper::SetNewContent(FXmlNodeContent Node, const FString& NewCont
 	Node.XmlNode->SetContent(NewContent);
 }
 
+bool UXmlParseHelper::AddNewNode(FXmlFileContent XmlFile, FString NewTag, FString NewContent)
+{
+	if (IsValid(XmlFile))
+	{
+		FXmlNodeContent RootNodeContent;
+		if (GetRootNodeFromFileContent(XmlFile, RootNodeContent))return false;
+
+		FXmlNodeContent ChildNode;
+		if (FindChildNode(NewTag, RootNodeContent, ChildNode))
+		{
+			SetNewContent(ChildNode, NewTag);
+		}
+		else
+		{
+			RootNodeContent.XmlNode->AppendChildNode(NewTag, NewContent);
+		}
+		return true;
+	}
+	return false;
+}
+
 bool UXmlParseHelper::SaveChange(FXmlFileContent XmlFileContent, const FString& SavePath)
 {
 	if (!XmlFileContent.XmlFile)
@@ -76,6 +97,22 @@ bool UXmlParseHelper::IsValid(FXmlFileContent XmlFile)
 {
 	if (XmlFile.XmlFile && XmlFile.XmlFile->IsValid())
 		return true;
+
+	return false;
+}
+
+bool UXmlParseHelper::FindChildContent(FXmlNodeContent Node, const FString& Tag, FXmlNodeContent& OutNode, FString& Content)
+{
+	if (Node.XmlNode)
+	{
+		FXmlNode* XmlNode = Node.XmlNode->FindChildNode(Tag);
+		if (XmlNode)
+		{
+			OutNode.XmlNode = XmlNode;
+			Content = XmlNode->GetContent();
+			return true;
+		}
+	}
 
 	return false;
 }

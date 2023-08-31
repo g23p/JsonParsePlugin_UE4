@@ -118,12 +118,15 @@ void UK2Node_JsonParse::ExpandNode(FKismetCompilerContext& CompilerContext, UEdG
 			UEdGraphPin* CallJsonKey = CallFuncNode->FindPinChecked(JsonKeyParamName);
 			UEdGraphPin* CallIsSucceed = CallFuncNode->GetReturnValuePin();
 			UEdGraphPin* CallReturnValue = CallFuncNode->FindPinChecked(JsonReturnValueName);
+			if(TypeStr == TEXT("NUMBER"))
+			{
 #if ENGINE_MAJOR_VERSION == 4
 			CallReturnValue->PinType.PinCategory = UEdGraphSchema_K2::PC_Float;
 #elif ENGINE_MAJOR_VERSION == 5
 			CallReturnValue->PinType.PinCategory = UEdGraphSchema_K2::PC_Real;
 			CallReturnValue->PinType.PinSubCategory = UEdGraphSchema_K2::PC_Double;
 #endif
+			}
 
 			CompilerContext.MovePinLinksToIntermediate(*ExecPin, *CallFuncNode->GetExecPin());
 

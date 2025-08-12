@@ -5,8 +5,8 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 
-#include "XmlParser/Public/XmlParser.h"
-
+//#include "XmlParser/Public/XmlParser.h"
+#include "XmlParser.h"
 
 #include "XmlParseHelper.generated.h"
 

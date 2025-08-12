@@ -264,35 +264,7 @@ bool UJsonParseHelper::Generic_GetNumberValue(const FJsonValueContent& JsonValue
 	double* OutPtr = DoubleProperty->GetPropertyValuePtr(ValueAddr);
 #endif
 
-	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
-	{
-		double OutNumber;
-		if (JsonValue.Value->AsObject()->TryGetNumberField(Key, OutNumber))
-		{
-			*OutPtr = OutNumber;
-			return true;
-		}
-	}
-	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
-	{
-		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
-		{
-			for (TPair<FString, TSharedPtr<FJsonValue>> Element : JsonValue.Value->AsArray()[0]->AsObject()->Values)
-			{
-				if (Element.Key == Key)
-				{
-					float OutNumber;
-					if (Element.Value->TryGetNumber(OutNumber))
-					{
-						*OutPtr = OutNumber;
-						return true;
-					}
-				}
-			}
-		}
-	}
-
-	return false;
+	return GetNumberValue_Template(JsonValue, Key, *OutPtr);
 }
 
 FString UJsonParseHelper::JsonNodeToString(const FJsonValueContent& JsonValue)

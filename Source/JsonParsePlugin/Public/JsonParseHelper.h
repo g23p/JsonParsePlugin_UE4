@@ -102,6 +102,9 @@ public:
 
 	static bool Generic_GetNumberValue(const FJsonValueContent& JsonValue, const FString& Key, void* ValueAddr, FProperty* ValueType);
 
+	template<typename T>
+	static bool GetNumberValue_Template(const FJsonValueContent& JsonValue, const FString& Key, T& FoundValue);
+
 	UFUNCTION(BlueprintCallable, Category = "Json|JsonWriter")
 		static FString JsonNodeToString(const FJsonValueContent& JsonValue);
 
@@ -109,3 +112,30 @@ public:
 	static FString NodeToString(FJsonValueContent JsonValue);
 };
 
+template<typename T>
+inline bool UJsonParseHelper::GetNumberValue_Template(const FJsonValueContent& JsonValue, const FString& Key, T& FoundValue)
+{
+	if (JsonValue.ValueType == FJsonValueType::JVT_OBJECT)
+	{
+		double OutNumber;
+		if (JsonValue.Value->AsObject()->TryGetNumberField(Key, OutNumber))
+		{
+			FoundValue = OutNumber;
+			return true;
+		}
+	}
+	else if (JsonValue.ValueType == FJsonValueType::JVT_ARRAY)
+	{
+		if (JsonValue.Value->AsArray().Num() == 1 && JsonValue.Value->AsArray()[0]->Type == EJson::Object)
+		{
+			double OutNumber;
+			if (JsonValue.Value->AsArray()[0]->AsObject()->TryGetNumberField(Key, OutNumber))
+			{
+				FoundValue = OutNumber;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
